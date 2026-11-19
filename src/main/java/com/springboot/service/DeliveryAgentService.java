@@ -152,7 +152,8 @@ public class DeliveryAgentService {
 
 	    return deliveryAgentRepository.save(agent);
 	}
-	public List<DeliveryAgent> getAgentsByRatingGreaterThan(Integer rating) {
+	// FIX: Match the Double rating field to avoid derived-query type errors.
+	public List<DeliveryAgent> getAgentsByRatingGreaterThan(Double rating) {
 
 	    return deliveryAgentRepository.findByRatingGreaterThan(rating);
 	}

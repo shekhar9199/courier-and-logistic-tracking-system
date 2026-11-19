@@ -70,9 +70,9 @@ public class Shipment {
     @JoinColumn(name = "agent_id")
     private DeliveryAgent deliveryAgent;
 
-    // One Shipment has exactly one Warehouse
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "warehouse_id", unique = true)
+    // FIX: Many shipments can be assigned to a warehouse; capacity is managed by warehouse.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
     private Warehouse warehouse;
 
     // One Shipment has exactly one Package

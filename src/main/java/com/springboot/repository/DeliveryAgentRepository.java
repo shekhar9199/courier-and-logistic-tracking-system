@@ -21,5 +21,6 @@ public interface DeliveryAgentRepository
 
     boolean existsByVehicleNoAndIdNot(String vehicleNo, Integer id);
     
-    List<DeliveryAgent> findByRatingGreaterThan(Integer rating);
+    // FIX: Rating is a Double entity field, so the derived-query parameter must match.
+    List<DeliveryAgent> findByRatingGreaterThan(Double rating);
 }

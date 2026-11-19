@@ -3,6 +3,7 @@ package com.springboot.entity;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -46,6 +47,8 @@ public class DeliveryAgent {
 
     private Double rating;
     
+    // FIX: Prevent circular JSON serialization through Shipment.deliveryAgent.
     @OneToMany(mappedBy = "deliveryAgent")
+    @JsonIgnore
     private List<Shipment> shipments;
 }

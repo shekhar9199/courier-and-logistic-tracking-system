@@ -136,22 +136,10 @@ public class CustomerService {
                 .orElseThrow(() ->
                     new IdNotFoundException("Customer not found with ID: " + id));
 
-        List<ShipmentStatus> restrictedStatuses = List.of(
-                ShipmentStatus.BOOKED,
-                ShipmentStatus.PICKED_UP,
-                ShipmentStatus.IN_TRANSIT,
-                ShipmentStatus.ARRIVED_AT_WAREHOUSE,
-                ShipmentStatus.OUT_FOR_DELIVERY,
-                ShipmentStatus.FAILED_DELIVERY
-        );
-
-        boolean hasActiveShipments =
-                shipmentRepository.existsByCustomer_IdAndStatusIn(
-                        id, restrictedStatuses);
-
-        if (hasActiveShipments) {
+        // FIX: Any linked shipment blocks deletion to avoid FK failures and orphaned records.
+        if (shipmentRepository.existsByCustomer_Id(id)) {
             throw new IllegalStateException(
-                    "Customer cannot be deleted because active shipments exist");
+                    "Customer cannot be deleted because shipments are associated with this customer");
         }
 
         customerRepository.delete(customer);
@@ -166,6 +154,13 @@ public class CustomerService {
     public Page<Customer> getCustomersWithPaginationAndSorting(
             int pageNumber, int pageSize, String sortBy) {
 
+        // FIX: Validate pagination and sort properties before Spring Data receives them.
+        if (pageNumber < 0 || pageSize < 1 || pageSize > 100) {
+            throw new IllegalArgumentException("Page must be non-negative and page size must be between 1 and 100");
+        }
+        if (sortBy == null || !Set.of("id", "name", "email", "contact").contains(sortBy)) {
+            throw new IllegalArgumentException("Invalid customer sort field: " + sortBy);
+        }
         Pageable pageable = PageRequest.of(
                 pageNumber,
                 pageSize,

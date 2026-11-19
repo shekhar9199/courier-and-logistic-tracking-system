@@ -91,7 +91,7 @@ public class DeliveryAgentController {
 	}
 	@GetMapping("/rating/greaterThan/{rating}")
 	public ResponseEntity<List<DeliveryAgent>> getAgentsByRatingGreaterThan(
-	        @PathVariable Integer rating) {
+	        @PathVariable Double rating) {
 
 	    return ResponseEntity.ok(
 	            deliveryAgentService.getAgentsByRatingGreaterThan(rating)

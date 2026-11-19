@@ -52,8 +52,15 @@ public class ShipmentService {
 
     @Transactional
     public Shipment createShipment(Shipment shipment) {
-    		System.out.println("Customer received: " + shipment.getCustomer());
-        // 1. Validate tracking number
+        // FIX: Removed debug output and reject a null body before dereferencing it.
+        if (shipment == null) {
+            throw new IllegalArgumentException("Shipment details are required");
+        }
+        // 1. Validate required route and tracking fields.
+        if (shipment.getSource() == null || shipment.getSource().isBlank()
+                || shipment.getDestination() == null || shipment.getDestination().isBlank()) {
+            throw new IllegalArgumentException("Shipment source and destination are required");
+        }
         if (shipment.getTrackingNumber() == null ||
                 shipment.getTrackingNumber().isBlank()) {
 
@@ -95,11 +102,11 @@ public class ShipmentService {
 
         Integer warehouseId = shipment.getWarehouse().getId();
 
-        shipment.setWarehouse(
-                warehouseRepository.findById(warehouseId)
-                        .orElseThrow(() -> new IdNotFoundException(
-                                "Warehouse not found with ID: " + warehouseId))
-        );
+        Warehouse warehouse = warehouseRepository.findById(warehouseId)
+                .orElseThrow(() -> new IdNotFoundException(
+                        "Warehouse not found with ID: " + warehouseId));
+        // FIX: Resolve the warehouse before assigning it; multiple shipments may share it.
+        shipment.setWarehouse(warehouse);
 
         // 4. Validate delivery agent (optional)
         if (shipment.getDeliveryAgent() != null) {
@@ -148,7 +155,7 @@ public class ShipmentService {
 
         // 7. Validate weight
         if (shipment.getWeight() == null ||
-                shipment.getWeight() <= 0) {
+                !Double.isFinite(shipment.getWeight()) || shipment.getWeight() <= 0) {
 
             throw new IllegalArgumentException(
                     "Shipment weight must be greater than zero");
@@ -157,10 +164,8 @@ public class ShipmentService {
         // 8. Set initial status
         shipment.setStatus(ShipmentStatus.BOOKED);
 
-        // 9. Initialize tracking history if null
-        if (shipment.getTrackingHistory() == null) {
-            shipment.setTrackingHistory(new ArrayList<>());
-        }
+        // FIX: Ignore client-supplied history; only server-generated history is trusted.
+        shipment.setTrackingHistory(new ArrayList<>());
 
         // 10. Create initial tracking history
         TrackingHistory history = new TrackingHistory();
@@ -207,6 +212,7 @@ public class ShipmentService {
     }
     
  // 4. Update Shipment Status
+    @Transactional
     public Shipment updateStatus(Integer shipmentId, ShipmentStatus status) {
 
         Shipment shipment = shipmentRepository.findById(shipmentId)
@@ -217,8 +223,17 @@ public class ShipmentService {
             throw new IllegalArgumentException("Shipment status is required");
         }
 
+        // FIX: Keep the shipment's status and audit trail in sync.
         shipment.setStatus(status);
-
+        TrackingHistory history = new TrackingHistory();
+        history.setShipment(shipment);
+        history.setStatus(status);
+        history.setLocation(status == ShipmentStatus.DELIVERED ? shipment.getDestination() : null);
+        history.setRemarks("Shipment status changed to " + status);
+        shipment.getTrackingHistory().add(history);
+        if (status == ShipmentStatus.DELIVERED && shipment.getDeliveryDate() == null) {
+            shipment.setDeliveryDate(LocalDateTime.now());
+        }
         return shipmentRepository.save(shipment);
     }
 
@@ -307,7 +322,7 @@ public class ShipmentService {
     	
 
         if (date == null) {
-            throw new IllegalStateException("Delivery date is required");
+            throw new IllegalArgumentException("Delivery date is required");
         }
 
         LocalDateTime startDate = date.atStartOfDay();
@@ -324,7 +339,7 @@ public class ShipmentService {
             int page, int size, String sortBy, String direction) {
 
         if (page < 0 || size <= 0 || size > 100) {
-            throw new IllegalStateException(
+            throw new IllegalArgumentException(
                     "Page must be 0 or greater and size must be between 1 and 100");
         }
 
@@ -333,13 +348,13 @@ public class ShipmentService {
                 "weight", "shipmentDateTime", "deliveryDate", "status"
         );
 
-        if (!allowedFields.contains(sortBy)) {
-            throw new IllegalStateException("Invalid sorting field: " + sortBy);
+        if (sortBy == null || !allowedFields.contains(sortBy)) {
+            throw new IllegalArgumentException("Invalid sorting field: " + sortBy);
         }
 
-        if (!direction.equalsIgnoreCase("ASC")
-                && !direction.equalsIgnoreCase("DESC")) {
-            throw new IllegalStateException(
+        if (direction == null || (!direction.equalsIgnoreCase("ASC")
+                && !direction.equalsIgnoreCase("DESC"))) {
+            throw new IllegalArgumentException(
                     "Direction must be ASC or DESC");
         }
 

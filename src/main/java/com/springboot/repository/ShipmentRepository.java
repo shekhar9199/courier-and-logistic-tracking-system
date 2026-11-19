@@ -18,6 +18,8 @@ public interface ShipmentRepository
             Integer customerId,
             List<ShipmentStatus> statuses
     );
+    // FIX: Protect the customer foreign key by blocking deletion while any shipment exists.
+    boolean existsByCustomer_Id(Integer customerId);
     
     boolean existsByDeliveryAgent_Id(Integer agentId);
     

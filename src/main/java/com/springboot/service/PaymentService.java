@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.springboot.entity.Payment;
 import com.springboot.entity.PaymentStatus;
 import com.springboot.exception.IdNotFoundException;
+import com.springboot.exception.IllegalStateException;
 import com.springboot.repository.PaymentRepository;
 
 @Service
@@ -20,8 +21,11 @@ public class PaymentService {
     // 1. Create Payment
     public Payment createPayment(Payment payment) {
 
-        // Validate amount
-        if (payment.getAmount() <= 0) {
+        // FIX: Guard against null request bodies and non-finite/non-positive amounts.
+        if (payment == null) {
+            throw new IllegalArgumentException("Payment details are required");
+        }
+        if (payment.getAmount() == null || !Double.isFinite(payment.getAmount()) || payment.getAmount() <= 0) {
             throw new IllegalArgumentException(
                     "Payment amount must be greater than zero");
         }
@@ -32,10 +36,8 @@ public class PaymentService {
                     "Payment method is required");
         }
 
-        // Set PENDING only when status is not provided
-        if (payment.getPaymentStatus() == null) {
-            payment.setPaymentStatus(PaymentStatus.PENDING);
-        }
+        // FIX: New payments always start pending; callers cannot mark an unpaid payment successful.
+        payment.setPaymentStatus(PaymentStatus.PENDING);
 
         return paymentRepository.save(payment);
     }
@@ -57,6 +59,10 @@ public class PaymentService {
     // 4. Get Payment Details by Customer ID
     public List<Payment> getPaymentDetailsByCustomer(Integer customerId) {
 
+        // FIX: Return a not-found response for invalid customer references.
+        if (customerId == null) {
+            throw new IllegalArgumentException("Customer ID is required");
+        }
         return paymentRepository.findByShipment_Customer_Id(customerId);
     }
 
@@ -70,6 +76,11 @@ public class PaymentService {
         if (status == null) {
             throw new IllegalArgumentException(
                     "Payment status is required");
+        }
+        // FIX: Prevent accidental transitions out of terminal payment states.
+        if (payment.getPaymentStatus() == PaymentStatus.REFUNDED
+                || payment.getPaymentStatus() == PaymentStatus.FAILED) {
+            throw new IllegalStateException("A terminal payment status cannot be changed");
         }
 
         payment.setPaymentStatus(status);
